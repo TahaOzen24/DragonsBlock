@@ -1,0 +1,77 @@
+name: Apple build checks
+
+on:
+  workflow_dispatch:
+  push:
+    branches: [main, master]
+    paths:
+      - '.github/workflows/apple-build.yml'
+      - 'lib/**'
+      - 'assets/**'
+      - 'ios/**'
+      - 'macos/**'
+      - 'pubspec.yaml'
+      - 'pubspec.lock'
+
+jobs:
+  ios:
+    name: iOS unsigned build
+    runs-on: macos-latest
+    steps:
+      - name: Check out source
+        uses: actions/checkout@v4
+
+      - name: Set up Flutter
+        uses: subosito/flutter-action@v2
+        with:
+          channel: stable
+          cache: true
+
+      - name: Install dependencies
+        run: flutter pub get
+
+      - name: Analyze
+        run: flutter analyze
+
+      - name: Test
+        run: flutter test
+
+      - name: Build unsigned iOS app
+        run: |
+          flutter build ios --release --no-codesign \
+            --dart-define-from-file=dart_defines.admob.json
+
+      - name: Upload unsigned iOS app
+        uses: actions/upload-artifact@v4
+        with:
+          name: dragonsblock-ios-unsigned
+          path: build/ios/iphoneos/Runner.app
+          if-no-files-found: error
+
+  macos:
+    name: macOS release build
+    runs-on: macos-latest
+    steps:
+      - name: Check out source
+        uses: actions/checkout@v4
+
+      - name: Set up Flutter
+        uses: subosito/flutter-action@v2
+        with:
+          channel: stable
+          cache: true
+
+      - name: Install dependencies
+        run: flutter pub get
+
+      - name: Build macOS app
+        run: |
+          flutter build macos --release \
+            --dart-define-from-file=dart_defines.admob.json
+
+      - name: Upload macOS app
+        uses: actions/upload-artifact@v4
+        with:
+          name: dragonsblock-macos
+          path: build/macos/Build/Products/Release/dragons_block.app
+          if-no-files-found: error

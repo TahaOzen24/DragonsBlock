@@ -1,0 +1,5 @@
+# Copy this file to android/admob.properties (gitignored) and paste your real App ID.
+# AdMob Console → Apps → DragonsBlock → App settings → App ID
+# Format: ca-app-pub-XXXXXXXXXXXXXXXX~YYYYYYYYYY
+
+ADMOB_APP_ID=ca-app-pub-8081463517220236~3039947448

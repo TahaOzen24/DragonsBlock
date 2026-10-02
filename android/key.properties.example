@@ -1,0 +1,9 @@
+# Copy to android/key.properties (gitignored) and fill real values.
+# Generate keystore:  powershell -File tool/create_upload_keystore.ps1
+#
+# storeFile is relative to the android/ folder.
+
+storePassword=REPLACE_WITH_STORE_PASSWORD
+keyPassword=REPLACE_WITH_KEY_PASSWORD
+keyAlias=upload
+storeFile=upload-keystore.jks

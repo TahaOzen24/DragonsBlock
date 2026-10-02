@@ -1,0 +1,21 @@
+{
+  "version": "0.2.0",
+  "configurations": [
+    {
+      "name": "DragonsBlock (TEST reklam — debug)",
+      "request": "launch",
+      "type": "dart",
+      "program": "lib/main.dart"
+    },
+    {
+      "name": "DragonsBlock (PROD birimler + force)",
+      "request": "launch",
+      "type": "dart",
+      "program": "lib/main.dart",
+      "toolArgs": [
+        "--dart-define-from-file=dart_defines.admob.json",
+        "--dart-define=ADMOB_FORCE_PROD=true"
+      ]
+    }
+  ]
+}
