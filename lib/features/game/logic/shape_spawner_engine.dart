@@ -38,6 +38,22 @@ class _PlaceableOption {
   });
 }
 
+class _FlowPick {
+  final _PlaceableOption option;
+  final int row;
+  final int col;
+  final int linesCleared;
+  final double score;
+
+  const _FlowPick({
+    required this.option,
+    required this.row,
+    required this.col,
+    required this.linesCleared,
+    required this.score,
+  });
+}
+
 /// Board-aware spawner with hard anti-softlock:
 /// at least one dealt piece is always placeable when any catalog piece fits.
 class ShapeSpawnerEngine {
@@ -331,6 +347,126 @@ class ShapeSpawnerEngine {
     return options.last;
   }
 
+  /// Chooses a piece by looking at the board after the piece is played, not
+  /// only at whether it fits on the current board. This keeps a full board
+  /// flowing without making the player solve a dead-end hand.
+  _FlowPick? _pickForFlow(
+    GridEngine gridEngine, {
+    GridEngine? availabilityGrid,
+    Set<ShapeFamily>? excludeFamilies,
+    List<ShapeArchetype>? pool,
+    required bool prioritizeClears,
+    required List<Color>? forcedPalette,
+  }) {
+    final options = _enumeratePlaceable(
+      gridEngine,
+      excludeFamilies: excludeFamilies,
+      pool: pool,
+    );
+    if (options.isEmpty) return null;
+
+    _FlowPick? best;
+    for (final option in options) {
+      final shape = _buildFromVariant(
+        option.archetype,
+        option.variant,
+        forcedPalette,
+      );
+      if (availabilityGrid != null &&
+          !availabilityGrid.canPlaceShapeAnywhere(shape)) {
+        continue;
+      }
+      for (int r = 0; r <= GridEngine.gridSize - shape.rowCount; r++) {
+        for (int c = 0; c <= GridEngine.gridSize - shape.colCount; c++) {
+          if (!gridEngine.canPlace(shape, r, c)) continue;
+
+          final snapshot = gridEngine.createSnapshot();
+          final result = gridEngine.placeShape(
+            shape,
+            r,
+            c,
+            const [],
+            recordProgress: false,
+          );
+          final mobility = _countFutureMobility(gridEngine);
+          gridEngine.restoreSnapshot(snapshot);
+
+          if (!result.success) continue;
+          final clearScore = result.linesCleared * (prioritizeClears ? 140.0 : 90.0);
+          final setupScore = mobility * 0.45;
+          final compactnessScore = (1.0 - gridEngine.occupancyRate) * 8.0;
+          final score = clearScore + setupScore + compactnessScore +
+              (option.clearPotential * 12.0);
+
+          if (best == null || score > best.score) {
+            best = _FlowPick(
+              option: option,
+              row: r,
+              col: c,
+              linesCleared: result.linesCleared,
+              score: score,
+            );
+          }
+        }
+      }
+    }
+    return best;
+  }
+
+  int _countFutureMobility(GridEngine gridEngine) {
+    var mobility = 0;
+    for (final archetype in rescueArchetypes) {
+      for (final variant in archetype.variants) {
+        final shape = PolyominoShape(
+          id: 'mobility_scan',
+          name: archetype.id,
+          matrix: variant,
+          baseColor: Colors.white,
+        );
+        mobility += gridEngine.countValidPlacements(shape);
+      }
+    }
+    return mobility;
+  }
+
+  List<PolyominoShape>? _generateFlowHand({
+    required GridEngine gridEngine,
+    required List<Color>? forcedPalette,
+    required bool prioritizeClears,
+  }) {
+    final simulation = GridEngine()..restoreSnapshot(gridEngine.createSnapshot());
+    final hand = <PolyominoShape>[];
+    final usedFamilies = <ShapeFamily>{};
+
+    for (var slot = 0; slot < GameTuning.shapesPerHand; slot++) {
+      final pick = _pickForFlow(
+        simulation,
+        availabilityGrid: gridEngine,
+        excludeFamilies: usedFamilies,
+        forcedPalette: forcedPalette,
+        prioritizeClears: prioritizeClears || slot == 0,
+      );
+      if (pick == null) break;
+
+      final shape = _buildFromVariant(
+        pick.option.archetype,
+        pick.option.variant,
+        forcedPalette,
+      );
+      hand.add(shape);
+      usedFamilies.add(pick.option.archetype.family);
+      simulation.placeShape(
+        shape,
+        pick.row,
+        pick.col,
+        const [],
+        recordProgress: false,
+      );
+    }
+
+    return hand.length == GameTuning.shapesPerHand ? hand : null;
+  }
+
   // ─── Public API ──────────────────────────────────────────────────────────
 
   List<PolyominoShape> generateBalancedHand({
@@ -351,6 +487,15 @@ class ShapeSpawnerEngine {
     if (gridEngine.isPristineHandQueued || gridEngine.isBoardCompletelyEmpty()) {
       gridEngine.isPristineHandQueued = false;
       return _buildPristineHand(isNewPlayer, forcedPalette);
+    }
+
+    if (occupancy >= 0.25 || droughtTracker.needsSolver) {
+      final flowHand = _generateFlowHand(
+        gridEngine: gridEngine,
+        forcedPalette: forcedPalette,
+        prioritizeClears: isCrowded || droughtTracker.needsSolver,
+      );
+      if (flowHand != null) return flowHand;
     }
 
     final usedFamilies = <ShapeFamily>{};

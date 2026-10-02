@@ -91,14 +91,25 @@ class BlockSpawnerBar extends StatelessWidget {
                         TweenAnimationBuilder<double>(
                           key: ValueKey(shape.id),
                           tween: Tween(begin: 0.0, end: 1.0),
-                          duration: Duration(milliseconds: 280 + index * 50),
-                          curve: Curves.easeOutBack,
+                          duration: Duration(milliseconds: 420 + index * 45),
                           builder: (context, animVal, child) {
+                            // Stagger the tray without delaying layout: each piece
+                            // settles in with a quiet lift instead of a hard pop.
+                            final start = index * 0.12;
+                            final localProgress = Interval(
+                              start,
+                              0.72 + index * 0.08,
+                              curve: Curves.easeOutCubic,
+                            ).transform(animVal);
                             return Transform.scale(
-                              scale: (0.40 + 0.60 * animVal).clamp(0.0, 1.08),
-                              child: Opacity(
-                                opacity: animVal.clamp(0.0, 1.0),
-                                child: child,
+                              scale: (0.88 + 0.12 * localProgress).clamp(0.0, 1.0),
+                              alignment: Alignment.bottomCenter,
+                              child: Transform.translate(
+                                offset: Offset(0, 10.0 * (1.0 - localProgress)),
+                                child: Opacity(
+                                  opacity: localProgress.clamp(0.0, 1.0),
+                                  child: child,
+                                ),
                               ),
                             );
                           },

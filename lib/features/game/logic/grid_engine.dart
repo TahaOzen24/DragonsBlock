@@ -351,6 +351,7 @@ class GridEngine {
     int startRow,
     int startCol,
     List<Relic> activeRelics,
+    {bool recordProgress = true}
   ) {
     if (!canPlace(shape, startRow, startCol)) {
       return PlacementResult(success: false);
@@ -587,14 +588,17 @@ class GridEngine {
         highScore = currentScore;
       }
 
-      // Report Quests AFTER score is accurately updated
-      QuestManager.instance.reportProgress('block_placer', 1);
-      QuestManager.instance.reportProgress('line_crusher', linesCleared);
-      if (linesCleared >= 2) {
-        QuestManager.instance.reportProgress('multi_clear_master', 1);
+      // Report quests only for real player moves; spawner simulations must be
+      // side-effect free.
+      if (recordProgress) {
+        QuestManager.instance.reportProgress('block_placer', 1);
+        QuestManager.instance.reportProgress('line_crusher', linesCleared);
+        if (linesCleared >= 2) {
+          QuestManager.instance.reportProgress('multi_clear_master', 1);
+        }
+        QuestManager.instance.reportProgress('combo_virtuoso', comboStreak, isAbsolute: true);
+        QuestManager.instance.reportProgress('high_score_hunter', currentScore, isAbsolute: true);
       }
-      QuestManager.instance.reportProgress('combo_virtuoso', comboStreak, isAbsolute: true);
-      QuestManager.instance.reportProgress('high_score_hunter', currentScore, isAbsolute: true);
 
       // Decrement frozen turns for all frozen cells (except permanently frozen)
       for (int r = 0; r < gridSize; r++) {
@@ -662,8 +666,10 @@ class GridEngine {
         highScore = currentScore;
       }
 
-      QuestManager.instance.reportProgress('block_placer', 1);
-      QuestManager.instance.reportProgress('high_score_hunter', currentScore, isAbsolute: true);
+      if (recordProgress) {
+        QuestManager.instance.reportProgress('block_placer', 1);
+        QuestManager.instance.reportProgress('high_score_hunter', currentScore, isAbsolute: true);
+      }
 
       // Decrement frozen turns for all frozen cells (except permanently frozen)
       for (int r = 0; r < gridSize; r++) {
